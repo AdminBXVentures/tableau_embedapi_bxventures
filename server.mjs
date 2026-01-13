@@ -3,9 +3,42 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
+import cors from "cors";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const app = express();
+
+// --- CORS (Railway via env var) ---
+const corsOriginsEnv = process.env.CORS_ORIGINS || "";
+const allowedOrigins = corsOriginsEnv
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // Allow requests without Origin (curl/postman/server-to-server)
+      if (!origin) return cb(null, true);
+
+      // If no origins configured, block by default (safer)
+      if (allowedOrigins.length === 0) {
+        return cb(new Error("CORS_ORIGINS is not set"), false);
+      }
+
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+
+      return cb(new Error(`CORS blocked for origin: ${origin}`), false);
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// Preflight support (important for POST with JSON)
+app.options("*", cors());
 
 // ChatKit env vars
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -17,7 +50,6 @@ const TABLEAU_SERVER_CONAPP_CLIENT_KEY_ID = process.env.TABLEAU_SERVER_CONAPP_CL
 const TABLEAU_SERVER_CONAPP_CLIENT_SECRET = process.env.TABLEAU_SERVER_CONAPP_CLIENT_SECRET;
 const TABLEAU_SERVER_CONAPP_USER = process.env.TABLEAU_SERVER_CONAPP_USER;
 
-const app = express();
 app.use(express.json());
 
 app.post("/api/chatkit/session", async (req, res) => {
