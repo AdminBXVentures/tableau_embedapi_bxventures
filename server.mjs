@@ -42,15 +42,22 @@ app.post("/api/chatkit/session", async (req, res) => {
   }
 });
 
-/**
- * NEW: Generate Tableau JWT (HS256) valid for 5 minutes
- * Expects JSON body: { "sub": "some-user-id-or-email" }
- * Returns: { "token": "<jwt>" }
- */
 app.post("/api/tableau/jwt", (req, res) => {
   try {
     const nowSec = Math.floor(Date.now() / 1000);
     const expSec = nowSec + 300; // 5 minutes
+
+    if (
+      !TABLEAU_SERVER_CONAPP_CLIENT_ID ||
+      !TABLEAU_SERVER_CONAPP_CLIENT_KEY_ID ||
+      !TABLEAU_SERVER_CONAPP_CLIENT_SECRET
+    ) {
+      return res.status(500).json({
+        error: "Server not configured for Tableau JWT",
+        details:
+          "Missing one or more env vars: TABLEAU_SERVER_CONAPP_CLIENT_ID, TABLEAU_SERVER_CONAPP_CLIENT_KEY_ID, TABLEAU_SERVER_CONAPP_CLIENT_SECRET",
+      });
+    }
 
     const jwtPayload = {
       sub: TABLEAU_SERVER_CONAPP_USER,
@@ -60,7 +67,6 @@ app.post("/api/tableau/jwt", (req, res) => {
       jti: crypto.randomUUID(),
     };
 
-    // Match your Python example: iss + kid in the JWT header
     const jwtHeaders = {
       iss: TABLEAU_SERVER_CONAPP_CLIENT_ID,
       kid: TABLEAU_SERVER_CONAPP_CLIENT_KEY_ID,
@@ -69,7 +75,6 @@ app.post("/api/tableau/jwt", (req, res) => {
     const token = jwt.sign(jwtPayload, TABLEAU_SERVER_CONAPP_CLIENT_SECRET, {
       algorithm: "HS256",
       header: jwtHeaders,
-      // Note: we already set exp ourselves, so no expiresIn here.
     });
 
     return res.json({ token });
